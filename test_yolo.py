@@ -2,10 +2,10 @@ from ultralytics import YOLO
 
 # --- SETUP ---
 # Replace with the actual name of your YOLO weights file
-model_path = "your_bubble_detector.pt" 
+model_path = "comic-speech-bubble-detector.pt"
 
 # Replace with a picture of a manga page to test
-test_image = "test_page.png" 
+test_image = "Screenshot 2026-05-26 at 23-52-28 Read The Hottie’s Good at Football RAW 56 - RawDEX.png" 
 # -------------
 
 print(f"Loading model: {model_path}...")

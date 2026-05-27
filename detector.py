@@ -2,7 +2,7 @@ from ultralytics import YOLO
 import cv2
 
 class BubbleDetector:
-    def __init__(self, model_path="your_bubble_detector.pt"):
+    def __init__(self, model_path="comic-speech-bubble-detector.pt"):
         print(f"[Detector]: Booting YOLO model from {model_path}...")
         self.model = YOLO(model_path)
         print("[Detector]: YOLO ready.")
@@ -14,8 +14,8 @@ class BubbleDetector:
         print("[Detector]: Hunting for text bubbles...")
         
         # Run YOLO inference (verbose=False keeps the terminal clean)
-        results = self.model(image_path, conf=0.25, verbose=False)
-        
+        #results = self.model(image_path, conf=0.25, verbose=False)
+        results = self.model(image_path, conf=0.25, verbose=False, device=0)
         # Load the raw image with OpenCV so we can slice it up
         img = cv2.imread(image_path)
         if img is None: return []

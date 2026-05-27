@@ -9,15 +9,8 @@ class Snipper(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowFlags(Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.FramelessWindowHint | Qt.WindowType.Tool)
-        
-        # --- THE LINUX TRANSPARENCY FIX ---
-        # 1. Tell the OS to allow true alpha-channel transparency for this window
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        
-        # 2. Use RGBA (Red, Green, Blue, Alpha) to make it 40% dark instead of using WindowOpacity
         self.setStyleSheet("background-color: rgba(0, 0, 0, 100);") 
-        # ----------------------------------
-        
         self.setCursor(Qt.CursorShape.CrossCursor)
         
         screen = QApplication.primaryScreen().geometry()
@@ -27,34 +20,66 @@ class Snipper(QWidget):
         self.origin = QPoint()
 
     def mousePressEvent(self, event):
-        """When you click, start drawing the box."""
         self.origin = event.pos()
         self.rubber_band.setGeometry(QRect(self.origin, self.origin))
         self.rubber_band.show()
 
     def mouseMoveEvent(self, event):
-        """As you drag, resize the box."""
         self.rubber_band.setGeometry(QRect(self.origin, event.pos()).normalized())
 
     def mouseReleaseEvent(self, event):
-        """When you let go, save the coordinates and close."""
         self.rubber_band.hide()
         rect = self.rubber_band.geometry()
-        # Send the (X, Y, Width, Height) back to the main app
         self.on_area_selected.emit((rect.x(), rect.y(), rect.width(), rect.height()))
         self.close()
 
-# --- Everything below here is your existing UI, just with a new button added! ---
+class TranslatorPanel(QWidget):
+    """The unified control bar and translation display panel."""
+    on_capture_requested = pyqtSignal()
+    on_clear_requested = pyqtSignal()
+    on_snip_requested = pyqtSignal()
+    on_mode_toggled = pyqtSignal()
 
-class SidePanel(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Translations")
+        self.setWindowTitle("Manga Translator")
         self.setWindowFlags(Qt.WindowType.WindowStaysOnTopHint)
-        self.resize(350, 600)
+        self.resize(350, 750) 
         
         self.layout = QVBoxLayout()
         self.setLayout(self.layout)
+        
+        self.snip_btn = QPushButton("Set Translation Area")
+        self.snip_btn.setStyleSheet("padding: 10px; font-size: 14px; font-weight: bold; background-color: #2196F3; color: white; border-radius: 5px;")
+        self.snip_btn.clicked.connect(self.on_snip_requested.emit)
+        
+        self.mode_btn = QPushButton("Mode: OFFLINE")
+        self.mode_btn.setStyleSheet("padding: 10px; font-size: 14px; font-weight: bold; background-color: #9C27B0; color: white; border-radius: 5px;")
+        self.mode_btn.clicked.connect(self.on_mode_toggled.emit)
+        
+        self.translate_btn = QPushButton("Translate Area")
+        self.translate_btn.setStyleSheet("padding: 15px; font-size: 16px; font-weight: bold; background-color: #4CAF50; color: white; border-radius: 5px;")
+        self.translate_btn.clicked.connect(self.on_capture_requested.emit)
+        
+        self.clear_btn = QPushButton("Clear Panel")
+        self.clear_btn.setStyleSheet("padding: 10px; font-size: 14px; font-weight: bold; background-color: #FF9800; color: white; border-radius: 5px;")
+        self.clear_btn.clicked.connect(self.on_clear_requested.emit)
+        
+        self.quit_btn = QPushButton("Quit")
+        self.quit_btn.setStyleSheet("padding: 10px; font-size: 14px; background-color: #f44336; color: white; border-radius: 5px;")
+        self.quit_btn.clicked.connect(QApplication.quit)
+        
+        self.layout.addWidget(self.snip_btn)
+        self.layout.addWidget(self.mode_btn)
+        self.layout.addWidget(self.translate_btn)
+        self.layout.addWidget(self.clear_btn)
+        self.layout.addWidget(self.quit_btn)
+        
+        line = QFrame()
+        line.setFrameShape(QFrame.Shape.HLine)
+        line.setFrameShadow(QFrame.Shadow.Sunken)
+        line.setStyleSheet("margin-top: 5px; margin-bottom: 5px;")
+        self.layout.addWidget(line)
         
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
@@ -91,41 +116,3 @@ class SidePanel(QWidget):
         for i in reversed(range(self.scroll_layout.count())): 
             widget = self.scroll_layout.itemAt(i).widget()
             if widget: widget.setParent(None)
-
-class FloatingButton(QWidget):
-    on_capture_requested = pyqtSignal()
-    on_clear_requested = pyqtSignal()
-    on_snip_requested = pyqtSignal() # NEW SIGNAL
-
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("Control")
-        self.setWindowFlags(Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool)
-        
-        layout = QVBoxLayout()
-        
-        # NEW SNIP BUTTON
-        self.snip_btn = QPushButton("🎯 Set Translation Area")
-        self.snip_btn.setStyleSheet("padding: 10px; font-size: 14px; font-weight: bold; background-color: #2196F3; color: white; border-radius: 5px;")
-        self.snip_btn.clicked.connect(self.on_snip_requested.emit)
-        
-        self.btn = QPushButton("📸 Translate Area")
-        self.btn.setStyleSheet("padding: 15px; font-size: 16px; font-weight: bold; background-color: #4CAF50; color: white; border-radius: 5px;")
-        self.btn.clicked.connect(self.on_capture_requested.emit)
-        
-        self.clear_btn = QPushButton("🧹 Clear Panel")
-        self.clear_btn.setStyleSheet("padding: 10px; font-size: 14px; font-weight: bold; background-color: #FF9800; color: white; border-radius: 5px;")
-        self.clear_btn.clicked.connect(self.on_clear_requested.emit)
-        
-        self.quit_btn = QPushButton("❌ Quit")
-        self.quit_btn.setStyleSheet("padding: 10px; font-size: 14px; background-color: #f44336; color: white; border-radius: 5px;")
-        self.quit_btn.clicked.connect(self.close_app)
-        
-        layout.addWidget(self.snip_btn)
-        layout.addWidget(self.btn)
-        layout.addWidget(self.clear_btn)
-        layout.addWidget(self.quit_btn)
-        self.setLayout(layout)
-
-    def close_app(self):
-        QApplication.quit()
