@@ -1,5 +1,6 @@
 import easyocr
 import cv2
+import numpy as np
 import argostranslate.package
 import argostranslate.translate
 from deep_translator import GoogleTranslator
@@ -13,10 +14,8 @@ class TranslationEngine:
         
         self.mode = start_mode
         
-        # Initialize Online Translator
         self.translator_online = GoogleTranslator(source='ko', target='en')
         
-        # Initialize Offline Translator
         print("[Engine]: Checking offline translator models...")
         self._setup_offline_translator()
 
@@ -50,46 +49,67 @@ class TranslationEngine:
         
         if not bubbles:
             print("[Engine]: No bubbles found in this area.")
-            return []
+            return # Stops the stream
 
-        results = []
-        korean_texts = []
+        processed_crops = []
         
-        print(f"[Engine]: Extracting text from {len(bubbles)} bubble(s)...")
+        print(f"[Engine]: Preparing {len(bubbles)} bubble(s) for the GPU...")
+        
         for b in bubbles:
             crop_img = b['crop']
             
+            if crop_img.size == 0:
+                continue
+                
             upscaled = cv2.resize(crop_img, None, fx=2.5, fy=2.5, interpolation=cv2.INTER_CUBIC)
             gray = cv2.cvtColor(upscaled, cv2.COLOR_BGR2GRAY)
             smooth = cv2.bilateralFilter(gray, 9, 75, 75)
             binary = cv2.adaptiveThreshold(smooth, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 15)
             
-            ocr_result = self.reader.readtext(binary, detail=0, paragraph=True, adjust_contrast=0.5)
-            
-            if ocr_result:
-                korean_texts.append(" ".join(ocr_result))
-            else:
-                korean_texts.append("") 
+            padded = cv2.copyMakeBorder(binary, 0, 50, 0, 0, cv2.BORDER_CONSTANT, value=[255, 255, 255])
+            processed_crops.append(padded)
 
-        if not any(korean_texts):
-            return []
+        if not processed_crops:
+            return # Stops the stream
+
+        max_width = max(img.shape[1] for img in processed_crops)
+
+        uniform_crops = []
+        for img in processed_crops:
+            pad_right = max_width - img.shape[1]
+            uniform_img = cv2.copyMakeBorder(img, 0, 0, 0, pad_right, cv2.BORDER_CONSTANT, value=[255, 255, 255])
+            uniform_crops.append(uniform_img)
+
+        master_image = cv2.vconcat(uniform_crops)
+
+        print("[Engine]: Firing GPU OCR on master image...")
+        korean_texts = self.reader.readtext(
+            master_image, 
+            detail=0, 
+            paragraph=True, 
+            adjust_contrast=0.5,
+            text_threshold=0.95,  # Default is 0.4. This forces EasyOCR to be 70% confident before guessing.
+            mag_ratio=1.5        # slightly improves image quality for the AI's internal reader
+        )
+
+        if not korean_texts:
+            return # Stops the stream
+
+        korean_texts = [text for text in korean_texts if text.strip()]
+
+        if not korean_texts:
+            return # Stops the stream
 
         print(f"[Engine]: Translating using {self.mode.upper()} mode...")
         
         if self.mode == "online":
-            # Batch process for high speed over the network
             english_texts = self.translator_online.translate_batch(korean_texts)
+            for kr, en in zip(korean_texts, english_texts):
+                yield {'original': kr, 'translation': en} 
         else:
-            # Local process using hardware
-            english_texts = []
-            for text in korean_texts:
-                if text.strip() and self.translator_offline:
-                    english_texts.append(self.translator_offline.translate(text))
+            for kr in korean_texts:
+                if self.translator_offline:
+                    en = self.translator_offline.translate(kr)
                 else:
-                    english_texts.append("")
-
-        for kr, en in zip(korean_texts, english_texts):
-            if kr.strip(): 
-                results.append({'original': kr, 'translation': en})
-                
-        return results
+                    en = "[Offline Error]"
+                yield {'original': kr, 'translation': en}
