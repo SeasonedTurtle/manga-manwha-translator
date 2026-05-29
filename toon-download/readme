@@ -1,0 +1,87 @@
+# 📖 Automated Manhwa Scanlation Pipeline
+
+An end-to-end Python automation tool that scrapes raw Korean manhwa chapters, performs AI-driven OCR and translation using Google's Gemini Vision API, mathematically cleans the speech bubbles using OpenCV, and typesets the English text into a finalized, continuous PDF.
+
+## ✨ Features
+
+* **Anti-Bot Bypass Scraping:** Uses `DrissionPage` to negotiate cookies and User-Agents, defeating 403 Forbidden errors and Hotlink protections.
+* **Smart Lazy-Load Handling:** Algorithmically scrolls to the true bottom of the page to ensure all image chunks are rendered before extraction.
+* **Hyper-Threaded Downloads:** Leverages `ThreadPoolExecutor` to download raw assets concurrently, slashing wait times.
+* **API Cost Optimization (Image Stitching):** Compresses hundreds of individual panels into vertical strips using `Pillow`, reducing API payloads by up to 80% to comfortably fit within free-tier quotas.
+* **AI-Powered OCR & Translation:** Utilizes **Gemini 3.1 Flash Lite** to simultaneously extract text bounding boxes, transcribe Korean, and generate natural English translations.
+* **OpenCV Bubble Cleaning:** Dynamically generates dilated masks and runs Telea Inpainting (`cv2.inpaint`) to erase text while preserving complex background art and preventing "ghosting."
+* **Automated Typesetting:** Wraps and centers English text within original bounding boxes, applying professional white-stroke outlines for perfect contrast against dark backgrounds.
+* **Crash-Proof Batching:** Built-in decoupled processing tracks progress. If the API hits a rate limit or encounters a syntax error, the script skips already-processed files upon restart, preventing duplicate API calls.
+
+---
+
+## 🛠️ Prerequisites
+
+You will need **Python 3.8+** and a standard installation of Google Chrome on your system. 
+
+---
+
+## 🚀 Setup & Configuration
+
+**1. Clone the Repository**
+Navigate to your desired directory and clone this project (or download the source files).
+
+**2. Install Dependencies**
+Install all required Python libraries via the provided requirements file:
+```bash
+pip install -r requirements.txt
+
+3. Configure Environment Variables
+This project uses a hidden .env file to securely store your API keys and target URLs.
+
+    Create a file named exactly .env in the root folder of the project.
+
+    Get a free API key from Google AI Studio.
+
+    Paste your credentials into the .env file like this:
+
+Code snippet
+
+GEMINI_API_KEY="your_actual_api_key_here"
+BASE_URL="[https://rawdex.net/manga/target-manga-url](https://rawdex.net/manga/target-manga-url)"
+
+(Optional): For professional-grade typesetting, download a comic font (like Anime Ace or CC Wild Words) in .ttf format, place it in your project folder, and update the font_path variable inside typesetter.py to point to it.
+⚙️ How to Use
+
+To run the full automated batch pipeline, simply execute the main orchestrator:
+Bash
+
+python main.py
+
+By default, main.py is configured to run a batch from Chapter 1 to 10. You can adjust the start and end variables at the bottom of main.py to target specific chapters. The script includes automated 60-second cooldowns between chapters to prevent IP bans and API throttling.
+📁 Directory Structure
+
+The pipeline automatically builds a non-destructive folder hierarchy:
+Plaintext
+
+📁 your_project_folder/
+ ├── 📁 raw_chapters/         # Phase 1: High-res scraped .jpg panels
+ ├── 📁 stitched_chapters/    # Phase 1.5 & 2: Compressed strips and translation .json data
+ └── 📁 final_chapters/       # Phase 3 & 4: The finalized Chapter_X_English.pdf
+
+🧠 Architecture / The 4-Phase Synthesis Engine
+
+    Phase 1 (Acquisition - scraper.py): Opens a Chromium instance, scrolls to trigger lazy-loads, syncs network states, and downloads raw panels.
+
+    Phase 1.5 (Compression - stitcher.py): Normalizes panel widths and mathematically stitches them into vertical chunks (~10,000px height limit) to bypass API bottlenecks.
+
+    Phase 2 (Machine Translation - translator.py): Sends strips to Gemini Vision, requesting a strict JSON response containing [ymin, xmin, ymax, xmax], original text, and translated text.
+
+    Phase 3 & 4 (Inpainting & Typesetting - typesetter.py): Reads the JSON matrix, un-normalizes coordinates back to pixel values, wipes the bubbles with cv2.inpaint, injects the English text with Pillow, and compiles everything into a readable eBook (.pdf).
+
+🚑 Troubleshooting
+
+Error: [CRITICAL ERROR]: Chapter X encountered a fatal exception: Expecting ',' delimiter...
+
+    Cause: Because Gemini is a generative AI, it occasionally produces a syntax error when generating JSON (usually by including an unescaped quotation mark inside the translated English text, which breaks the JSON formatting).
+
+    Solution: Navigate to your stitched_chapters/chapter_X folder. Find the .json file that was just created and delete it. Re-run main.py. The script will instantly skip the images it already processed and ask Gemini to regenerate the corrupted file.
+
+⚠️ Disclaimer
+
+This tool is built for educational purposes, workflow automation research, and personal archive translation. Please respect website rate limits, adhere to terms of service, and support official manga/manhwa creators and publishers whenever possible.

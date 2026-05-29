@@ -1,0 +1,13 @@
+# Security
+*.env
+.env
+
+# Project Output Directories
+raw_chapters/
+stitched_chapters/
+final_chapters/
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class

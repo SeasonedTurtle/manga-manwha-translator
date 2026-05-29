@@ -1,0 +1,16 @@
+# Virtual Environment
+env/
+venv/
+
+# Python Cache
+__pycache__/
+*.pyc
+
+# AI Model Weights
+*.pt
+*.pth
+
+# App Data
+images/
+capture.png
+full_capture.png
