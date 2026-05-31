@@ -75,7 +75,21 @@ class MangaTypesetter:
             if "box_2d" not in item or not item["box_2d"]:
                 continue
             
-            ymin, xmin, ymax, xmax = item["box_2d"]
+            box = item["box_2d"]
+            
+            # --- 1. LLM HALLUCINATION FIX ---
+            # Un-nest the list if Gemini accidentally wrapped it in an extra bracket
+            if isinstance(box, list) and len(box) == 1 and isinstance(box[0], list):
+                box = box[0]
+                
+            # Skip this bubble entirely if it doesn't have exactly 4 coordinates
+            if not isinstance(box, list) or len(box) != 4:
+                print(f"  -> [Warning]: Skipping malformed coordinates: {box}")
+                continue
+            
+            ymin, xmin, ymax, xmax = box
+            
+            # De-normalize coordinates to true pixels
             ymin_px = int((ymin / 1000) * height)
             xmin_px = int((xmin / 1000) * width)
             ymax_px = int((ymax / 1000) * height)
@@ -86,8 +100,8 @@ class MangaTypesetter:
             # Draw the initial erasure zone
             cv2.rectangle(mask, (xmin_px, ymin_px), (xmax_px, ymax_px), 255, -1)
 
-        # --- THE GHOSTING FIX: DILATE THE MASK ---
-        # This expands the erase boxes by ~3 pixels to catch blurry text edges
+        # --- 2. THE GHOSTING FIX: DILATE THE MASK ---
+        # Expands the erase boxes by ~3 pixels to catch blurry text edges
         kernel = np.ones((3, 3), np.uint8)
         dilated_mask = cv2.dilate(mask, kernel, iterations=2)
 
@@ -106,12 +120,28 @@ class MangaTypesetter:
         except IOError:
             font = ImageFont.load_default()
 
-        # Step C: Draw text with White Outlines
+        # Step C: Draw text with Dynamic Padding and White Outlines
         for xmin, ymin, xmax, ymax, text in valid_boxes:
             box_width = xmax - xmin
             box_height = ymax - ymin
             
-            wrapped_lines = self._wrap_text(text, font, box_width - 20)
+            # --- 3. THE ROBUSTNESS FIX: DYNAMIC PADDING ---
+            # Shrink the available canvas area by 15% on all sides 
+            # to prevent text from bleeding into bubble tails or edges.
+            pad_x = int(box_width * 0.15)
+            pad_y = int(box_height * 0.15)
+            
+            safe_width = box_width - (pad_x * 2)
+            safe_height = box_height - (pad_y * 2)
+            
+            # Failsafe: If the box is incredibly tiny, ignore padding so it still renders
+            if safe_width < 20 or safe_height < 20:
+                safe_width = box_width
+                safe_height = box_height
+                pad_x = 0
+                pad_y = 0
+            
+            wrapped_lines = self._wrap_text(text, font, safe_width)
             
             line_heights = []
             for line in wrapped_lines:
@@ -119,14 +149,15 @@ class MangaTypesetter:
                 line_heights.append(bbox[3] - bbox[1])
             
             total_text_height = sum(line_heights) + (len(wrapped_lines) - 1) * 4
-            current_y = ymin + (box_height - total_text_height) // 2
+            
+            # Center the text inside the SAFE padded area, not the raw box
+            current_y = (ymin + pad_y) + (safe_height - total_text_height) // 2
             
             for i, line in enumerate(wrapped_lines):
                 bbox = draw.textbbox((0, 0), line, font=font)
                 line_width = bbox[2] - bbox[0]
-                current_x = xmin + (box_width - line_width) // 2
+                current_x = (xmin + pad_x) + (safe_width - line_width) // 2
                 
-                # --- THE CONTRAST FIX: STROKE WIDTH ---
                 # Draw sharp black text with a 2-pixel white outline
                 draw.text(
                     (current_x, current_y), 
@@ -139,36 +170,7 @@ class MangaTypesetter:
                 current_y += line_heights[i] + 4
 
         return clean_pil_img
-        # Step C: Draw wrapped, centered English text over clean bubbles
-        for xmin, ymin, xmax, ymax, text in valid_boxes:
-            box_width = xmax - xmin
-            box_height = ymax - ymin
             
-            # Wrap text to fit the bubble width constraints safely
-            wrapped_lines = self._wrap_text(text, font, box_width - 20)
-            
-            # Calculate total height of wrapped text block to center it vertically
-            line_heights = []
-            for line in wrapped_lines:
-                bbox = draw.textbbox((0, 0), line, font=font)
-                line_heights.append(bbox[3] - bbox[1])
-            
-            total_text_height = sum(line_heights) + (len(wrapped_lines) - 1) * 4
-            
-            # Center alignment entry point calculation
-            current_y = ymin + (box_height - total_text_height) // 2
-            
-            for i, line in enumerate(wrapped_lines):
-                bbox = draw.textbbox((0, 0), line, font=font)
-                line_width = bbox[2] - bbox[0]
-                current_x = xmin + (box_width - line_width) // 2
-                
-                # Draw sharp black text
-                draw.text((current_x, current_y), line, fill=(0, 0, 0), font=font)
-                current_y += line_heights[i] + 4
-
-        return clean_pil_img
-
     def _wrap_text(self, text, font, max_width):
         """Helper logic to split English strings into perfectly dimensioned lines."""
         words = text.split()
@@ -193,10 +195,11 @@ class MangaTypesetter:
         if current_line:
             lines.append(' '.join(current_line))
         return lines
-    
+
 if __name__ == "__main__":
     print("=== RUNNING STANDALONE TYPESETTER ===")
     # Initialize the engine
     engine = MangaTypesetter()
     # Point it at the chapter you already translated
-    engine.process_chapter(chapter_number="1")
+    engine.process_chapter(chapter_number="25")
+ 

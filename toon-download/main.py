@@ -6,10 +6,11 @@ from scraper import MangaScraper
 from stitcher import MangaStitcher
 from translator import MangaTranslator
 from typesetter import MangaTypesetter
+from estimator import estimate_pipeline_run # Optional: Ensure you import your estimator!
 
-# Load the hidden variables from the .env file
+# Load the hidden variables from your info.env file
+#load_dotenv(dotenv_path="info.env")
 load_dotenv()
-
 # Pull variables securely
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 BASE_URL = os.getenv("BASE_URL")
@@ -20,24 +21,24 @@ def process_single_chapter(chapter_num, scraper, stitcher, translator, typesette
     print(f"=== INITIATING PROTOCOL FOR CHAPTER {chapter_num} ===")
     print(f"=========================================\n")
     
-    # ACQUISITION 
+    # --- PHASE 1: ACQUISITION ---
     image_paths = scraper.download_chapter(BASE_URL, chapter_num)
     if not image_paths:
         print(f"[System Error]: Scraper failed on Chapter {chapter_num}. Skipping.")
         return False
 
-    # IMAGE STITCHING 
+    # --- PHASE 1.5: IMAGE STITCHING ---
     print(f"\n[System]: Compressing Chapter {chapter_num} into strips...")
     strip_paths = stitcher.stitch_chapter(chapter_number=chapter_num, images_per_strip=5)
     if not strip_paths:
         print(f"[System Error]: Stitching failed on Chapter {chapter_num}. Skipping.")
         return False
         
-    # TRANSLATION 
+    # --- PHASE 2: MACHINE TRANSLATION ---
     print(f"\n[System]: Deploying Gemini Translation Engine for Chapter {chapter_num}...")
     translator.process_chapter(chapter_number=chapter_num)
 
-    # INPAINTING & TYPESETTING ---
+    # --- PHASE 3 & 4: INPAINTING & TYPESETTING ---
     print(f"\n[System]: Commencing typesetting and PDF compilation for Chapter {chapter_num}...")
     typesetter.process_chapter(chapter_number=chapter_num)
     
@@ -45,13 +46,18 @@ def process_single_chapter(chapter_num, scraper, stitcher, translator, typesette
     return True
 
 def bulk_run(start_chapter, end_chapter):
-    # Check if the user is a knower or impacient loser
-    if not GEMINI_API_KEY or GEMINI_API_KEY == "insert_your_api_key_here":
-        print("\n[System Halt]: Please insert a valid Gemini API key into your .env file.")
+    if not GEMINI_API_KEY or GEMINI_API_KEY == "your_actual_api_key_here":
+        print("\n[System Halt]: Please insert a valid Gemini API key into your info.env file.")
         return
         
-    if not BASE_URL or BASE_URL == "insert_base_manga_url_here":
-        print("\n[System Halt]: Please insert a valid target BASE_URL into your .env file.")
+    if not BASE_URL or BASE_URL == "https://rawdex.net/manga/target-manga-url":
+        print("\n[System Halt]: Please insert a valid target BASE_URL into your info.env file.")
+        return
+
+    # Check if the run is viable within the daily quota
+    chapters_to_run = (end_chapter - start_chapter) + 1
+    if not estimate_pipeline_run(num_chapters=chapters_to_run):
+        print("\n[System Halt]: Aborting batch run due to quota constraints.")
         return
 
     print("=== STARTING THE AUTOMATED BATCH PIPELINE ===")
@@ -93,8 +99,7 @@ def bulk_run(start_chapter, end_chapter):
     print("=========================================")
 
 if __name__ == "__main__":
-    # Select range of chapters to run
-    # usually do 8-9 at a time unless you pay for an api
-    start = 21
+    # Define your target batch range here
+    start = 24
     end = 25
     bulk_run(start, end)

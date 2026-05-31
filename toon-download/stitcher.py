@@ -7,7 +7,7 @@ class MangaStitcher:
         self.output_dir = output_dir
         os.makedirs(self.output_dir, exist_ok=True)
 
-    def stitch_chapter(self, chapter_number, images_per_strip=5, max_height=10000):
+    def stitch_chapter(self, chapter_number, images_per_strip=6, max_height=10000):
         chapter_folder = os.path.join(self.input_dir, f"chapter_{chapter_number}")
         output_folder = os.path.join(self.output_dir, f"chapter_{chapter_number}")
         os.makedirs(output_folder, exist_ok=True)
