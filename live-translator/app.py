@@ -1,3 +1,5 @@
+import time
+
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import QTimer
 from ui import TranslatorPanel, Snipper
@@ -71,7 +73,7 @@ class MangaTranslatorApp:
         self.panel.translate_once_btn.setText("Translating...")
         QApplication.processEvents()
 
-        img_path = self.scanner.capture_screen(update_memory=True) 
+        img_path = self.scanner.capture_screen(update_memory=True)
         self.execute_translation_job(img_path, manual=True)
 
     def toggle_live_mode(self):
@@ -102,32 +104,35 @@ class MangaTranslatorApp:
             
             print("[App]: ⏹️ Live Mode Stopped.")
 
+    def reading_order(self):
+        return "vertical" if self.panel.read_toggle.isChecked() else "horizontal"
+
+    def settle_seconds(self):
+        """Vertical strips need a real pause. A clicked page only needs the image to finish loading."""
+        seconds = self.get_speed_ms() / 1000
+        if self.reading_order() == "horizontal":
+            return min(seconds, 0.8)
+        return seconds
+
     def execute_live_translation(self):
         # Safety catch: If user clicked STOP while we were in cooldown, abort the loop!
         if not self.is_live: return
         if self.is_processing: return
 
+        self.scanner.observe(time.time())
+        if not self.scanner.page_is_ready(time.time(), self.settle_seconds()):
+            QTimer.singleShot(250, self.execute_live_translation)
+            return
+
+        self.scanner.mark_translated()
         self.is_processing = True
-        is_webtoon = self.panel.read_toggle.isChecked()
-
-        if is_webtoon:
-            img_path, did_change = self.scanner.capture_and_check()
-            if not did_change:
-                # Screen hasn't changed. Skip AI, wait for cooldown, and check again.
-                self.is_processing = False
-                QTimer.singleShot(self.get_speed_ms(), self.execute_live_translation)
-                return
-        else:
-            # Interval mode: Just blindly take a picture and run it
-            img_path = self.scanner.capture_screen(update_memory=True)
-
-        print("\n[App]: 🤖 Capturing screen and starting AI Processing...")
-        self.execute_translation_job(img_path, manual=False)
+        print("\n[App]: 🤖 Page settled. Starting AI Processing...")
+        self.execute_translation_job(self.scanner.output_path, manual=False)
 
     def execute_translation_job(self, img_path, manual=False):
         self.is_processing = True
         
-        self.worker = AIWorkerThread(self.engine, img_path)
+        self.worker = AIWorkerThread(self.engine, img_path, order=self.reading_order())
         self.worker.clear_requested.connect(self.panel.clear_translations)
         self.worker.bubble_ready.connect(self.on_bubble_ready)
         
@@ -151,10 +156,8 @@ class MangaTranslatorApp:
     def on_live_frame_finished(self, total_count):
         self.is_processing = False
         
-        # THE SEQUENTIAL LOOP FINISHES HERE!
-        # The AI is completely done, the UI is updated. We now trigger a "SingleShot" timer.
-        # This acts as a pure cooldown. It waits exactly the specified seconds, then starts again.
+        # The page is already marked, so the loop only fires again after the next
+        # scroll pause or the next clicked page.
         if self.is_live:
-            speed_ms = self.get_speed_ms()
-            print(f"[App]: ✅ Translation shown! Cooldown started: {speed_ms/1000} seconds.")
-            QTimer.singleShot(speed_ms, self.execute_live_translation)
+            print("[App]: ✅ Translation shown. Watching for the next page.")
+            QTimer.singleShot(250, self.execute_live_translation)

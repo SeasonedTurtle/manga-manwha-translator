@@ -56,6 +56,8 @@ How to use
 
     Translate: Click Translate Area. The app will instantly scan the targeted zone, process the text, and output the English translations in the side panel.
 
+    Live: Start Live Translate after the area is set. Vertical Scroll waits until you pause on a long strip. Horizontal Click waits until the next clicked page (nhentai-style readers included) finishes loading, then translates that page once. The speed menu is how long the page has to hold still. Horizontal pages are read right to left.
+
     Read: Turn the page on your browser, and hit Translate Area again.
 
     Clear: Use the Clear Panel button to wipe old translations if the UI gets too cluttered.

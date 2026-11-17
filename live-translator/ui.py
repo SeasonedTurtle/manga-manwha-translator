@@ -115,7 +115,7 @@ class TranslatorPanel(QWidget):
         self.read_toggle.setChecked(True) # Default to Webtoon (Green)
         
         # 2. The Dynamic Label
-        self.toggle_label = QLabel("Vertical Webtoon")
+        self.toggle_label = QLabel("Vertical Scroll")
         self.toggle_label.setStyleSheet("font-weight: bold; font-size: 13px;")
         self.read_toggle.toggled.connect(self.update_toggle_label)
         
@@ -123,6 +123,7 @@ class TranslatorPanel(QWidget):
         self.speed_combo = QComboBox()
         self.speed_combo.addItems(["Fast (1s)", "Normal (2s)", "Slow (3s)", "Very Slow (4s)"])
         self.speed_combo.setCurrentIndex(1) # Default to Normal (2s)
+        self.speed_combo.setToolTip("How long the picture must hold still before translating. Clicked pages cap this at 0.8s.")
         self.speed_combo.setStyleSheet("padding: 5px; font-size: 12px; border: 1px solid #ccc; border-radius: 3px;")
         
         settings_layout.addWidget(self.read_toggle)
@@ -159,9 +160,9 @@ class TranslatorPanel(QWidget):
 
     def update_toggle_label(self, is_checked):
         if is_checked:
-            self.toggle_label.setText("Vertical Webtoon")
+            self.toggle_label.setText("Vertical Scroll")
         else:
-            self.toggle_label.setText("Horizontal Manga")
+            self.toggle_label.setText("Horizontal Click")
 
     def add_translation(self, index, original, translation):
         card = QFrame()

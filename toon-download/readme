@@ -5,7 +5,7 @@ An end-to-end Python automation tool that scrapes raw Korean manhwa chapters, pe
 ## ✨ Features
 
 * **Anti-Bot Bypass Scraping:** Uses `DrissionPage` to negotiate cookies and User-Agents, defeating 403 Forbidden errors and Hotlink protections.
-* **Smart Lazy-Load Handling:** Algorithmically scrolls to the true bottom of the page to ensure all image chunks are rendered before extraction.
+* **Vertical and horizontal readers:** Long-strip chapters are still deep-scrolled. Click-to-advance readers (nhentai galleries included) are detected and collected page by page. nhentai galleries use the official API instead of the HTML.
 * **Hyper-Threaded Downloads:** Leverages `ThreadPoolExecutor` to download raw assets concurrently, slashing wait times.
 * **API Cost Optimization (Image Stitching):** Compresses hundreds of individual panels into vertical strips using `Pillow`, reducing API payloads by up to 80% to comfortably fit within free-tier quotas.
 * **AI-Powered OCR & Translation:** Utilizes **Gemini 3.1 Flash Lite** to simultaneously extract text bounding boxes, transcribe Korean, and generate natural English translations.
@@ -66,7 +66,7 @@ Plaintext
 
 🧠 Architecture / The 4-Phase Synthesis Engine
 
-    Phase 1 (Acquisition - scraper.py): Opens a Chromium instance, scrolls to trigger lazy-loads, syncs network states, and downloads raw panels.
+    Phase 1 (Acquisition - scraper.py): Opens a Chromium instance for vertical chapters and scrolls to trigger lazy-loads. Horizontal click readers are advanced with the next control. An nhentai gallery URL is downloaded from the official API. Set `READER_MODE=vertical` or `READER_MODE=horizontal` to override detection. Use `BASE_URL="https://nhentai.net/g"` and the gallery id as the chapter number.
 
     Phase 1.5 (Compression - stitcher.py): Normalizes panel widths and mathematically stitches them into vertical chunks (~10,000px height limit) to bypass API bottlenecks.
 

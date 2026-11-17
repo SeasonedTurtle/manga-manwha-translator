@@ -44,8 +44,8 @@ class TranslationEngine:
         else:
             self.translator_offline = None
 
-    def process_image(self, img_path):
-        bubbles = self.detector.extract_bubbles(img_path)
+    def process_image(self, img_path, order="vertical"):
+        bubbles = self.detector.extract_bubbles(img_path, order=order)
         
         if not bubbles:
             print("[Engine]: No bubbles found in this area.")
