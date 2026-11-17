@@ -1,16 +1,15 @@
-from ultralytics import YOLO
-import cv2
-
 class BubbleDetector:
     def __init__(self, model_path="comic-speech-bubble-detector.pt"):
+        from ultralytics import YOLO
         print(f"[Detector]: Booting YOLO model from {model_path}...")
         self.model = YOLO(model_path)
         print("[Detector]: YOLO ready.")
 
-    def extract_bubbles(self, image_path, padding=5):
+    def extract_bubbles(self, image_path, padding=5, order="vertical"):
         """
         Scans an image, finds speech bubbles, and returns a list of cropped images.
         """
+        import cv2
         print("[Detector]: Hunting for text bubbles...")
         
         # Run YOLO inference (verbose=False keeps the terminal clean)
@@ -43,7 +42,28 @@ class BubbleDetector:
                 "crop": crop # The actual pixel data of JUST the text bubble
             })
 
-        # Sort the bubbles top-to-bottom so the reading order makes sense in your UI
-        bubbles.sort(key=lambda b: b['y'])
-        
-        return bubbles
+        return sort_bubbles(bubbles, order)
+
+
+def _same_column(bubble, column):
+    anchor = column[0]
+    return bubble["x"] < anchor["x"] + anchor["w"] and bubble["x"] + bubble["w"] > anchor["x"]
+
+
+def sort_bubbles(bubbles, order="vertical"):
+    """Vertical strips read top to bottom. Clicked pages read right column first."""
+    if order != "horizontal":
+        return sorted(bubbles, key=lambda bubble: (bubble["y"], bubble["x"]))
+
+    columns = []
+    for bubble in sorted(bubbles, key=lambda item: -item["x"]):
+        column = next((group for group in columns if _same_column(bubble, group)), None)
+        if column is None:
+            columns.append([bubble])
+        else:
+            column.append(bubble)
+
+    ordered = []
+    for column in columns:
+        ordered.extend(sorted(column, key=lambda bubble: bubble["y"]))
+    return ordered

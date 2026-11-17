@@ -5,14 +5,15 @@ class AIWorkerThread(QThread):
     finished_all = pyqtSignal(int) 
     clear_requested = pyqtSignal() 
 
-    def __init__(self, engine, img_path):
+    def __init__(self, engine, img_path, order="vertical"):
         super().__init__()
         self.engine = engine
         self.img_path = img_path
+        self.order = order
 
     def run(self):
         count = 0
-        for bubble in self.engine.process_image(self.img_path):
+        for bubble in self.engine.process_image(self.img_path, order=self.order):
             # Only wipe the UI the exact millisecond the FIRST valid bubble is ready
             if count == 0:
                 self.clear_requested.emit() 
